@@ -1,21 +1,17 @@
-// selection.js con percorsi aggiornati per la struttura /public/assets/img
-
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 // Load images
-const player1Img = new Image(); player1Img.src = "./assets/img/Player1.png";
-const player2Img = new Image(); player2Img.src = "./assets/img/Player2.png";
+const player1Img = new Image(); player1Img.src = "assets/img/Player1.png";
+const player2Img = new Image(); player2Img.src = "assets/img/Player2.png";
 const weaponIcons = [
   new Image(),
   new Image(),
   new Image()
 ];
-weaponIcons[0].src = "./assets/img/Knife.png";      // Knife
-weaponIcons[1].src = "./assets/img/Pistol.png";     // Pistol
-weaponIcons[2].src = "./assets/img/Firestaff.png";  // Firestaff
-
-// ... (resto del codice invariato)
+weaponIcons[0].src = "assets/img/Knife.png";      // Knife
+weaponIcons[1].src = "assets/img/Pistol.png";     // Pistol
+weaponIcons[2].src = "assets/img/Firestaff.png";  // Firestaff
 
 // Weapon names
 const weaponChoices = ["knife", "pistol", "firestaff"];
@@ -92,22 +88,16 @@ function draw() {
   // Instruction text
   ctx.fillStyle = "#000";
   ctx.font = "32px serif";
-  ctx.textAlign = "center";
   ctx.fillText("Make your choice!", 600, 700);
 
-  // GO TO BATTLE (in alto a destra)
-  ctx.fillStyle = "#000";
-  ctx.font = "20px monospace";
+  // Go to Battle text
+  ctx.fillStyle = "green";
+  ctx.font = "24px monospace";
   ctx.textAlign = "right";
-  ctx.fillText("GO TO BATTLE!", canvas.width - 20, 30);
-}
-
-function update() {
-  // Nessuna logica temporale
+  ctx.fillText("GO TO BATTLE! [SPACE]", canvas.width - 30, 50);
 }
 
 function gameLoop() {
-  update();
   draw();
   requestAnimationFrame(gameLoop);
 }
@@ -133,7 +123,8 @@ window.addEventListener("keydown", e => {
       p2WeaponIndex = (p2WeaponIndex + 1) % weaponChoices.length;
       break;
     case " ":
-      endSelection(); // SPACEBAR = GO TO BATTLE
+      e.preventDefault(); // 👈 serve per evitare il refresh del browser
+      endSelection();     // GO TO BATTLE
       break;
   }
 });
