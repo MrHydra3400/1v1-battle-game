@@ -1,11 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="refresh" content="0; url=selection.html" />
-    <title>Redirecting...</title>
-  </head>
-  <body>
-    <p>Redirecting to selection...</p>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <title>1v1 Battle Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { margin: 0; font-family: monospace; background: #fff; }
+    canvas { display: none; }
+  </style>
+</head>
+<body>
+
+  <div id="selectionScreen"></div>
+  <canvas id="gameCanvas" width="1200" height="800"></canvas>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get("mode");
+
+    const script = document.createElement("script");
+    script.src = mode === "main" ? "js/main.js" : "js/selection.js";
+    document.body.appendChild(script);
+  </script>
+
+</body>
 </html>
