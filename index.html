@@ -5,8 +5,17 @@
   <title>1v1 Battle Game</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    body { margin: 0; font-family: monospace; background: #fff; }
-    canvas { display: none; }
+    body {
+      margin: 0;
+      font-family: monospace;
+      background: #fff;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: white;
+    }
   </style>
 </head>
 <body>
@@ -17,13 +26,11 @@
   <script>
     const params = new URLSearchParams(window.location.search);
     const mode = params.get("mode");
-
-    if (mode === "main") {
-      document.getElementById("gameCanvas").style.display = "block"; // 👈 serve questa riga!
-    }
-
+    
     const script = document.createElement("script");
-    script.src = mode === "main" ? "js/main.js" : "js/selection.js";
+    script.src = `/js/${mode === "main" ? "main.js" : "selection.js"}`;
+    script.onload = () => console.log(`Loaded ${script.src}`);
+    script.onerror = () => console.error(`Failed to load ${script.src}`);
     document.body.appendChild(script);
   </script>
 
