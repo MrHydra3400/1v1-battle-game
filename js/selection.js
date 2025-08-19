@@ -2,19 +2,24 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 // Load images
-const player1Img = new Image(); player1Img.src = "assets/img/Player1.png";
-const player2Img = new Image(); player2Img.src = "assets/img/Player2.png";
+const player1Img = new Image(); player1Img.src = "assets/img/player1.png";
+const player2Img = new Image(); player2Img.src = "assets/img/player2.png";
 const weaponIcons = [
   new Image(),
   new Image(),
-  new Image()
+  new Image(),
+  new Image(), // aggiunta
+  new Image(), // Bow
+  new Image() // Bolt
 ];
 weaponIcons[0].src = "assets/img/Knife.png";      // Knife
-weaponIcons[1].src = "assets/img/Pistol.png";     // Pistol
-weaponIcons[2].src = "assets/img/Firestaff.png";  // Firestaff
-
+weaponIcons[1].src = "assets/img/pistol.png";     // Pistol
+weaponIcons[2].src = "assets/img/firestaff.png";  // Firestaff
+weaponIcons[3].src = "assets/img/flailshield.png"; // Flail and Shield
+weaponIcons[4].src = "assets/img/bow_hold.png"; // Bow
+weaponIcons[5].src = "assets/img/bolt.png"; // Bolt
 // Weapon names
-const weaponChoices = ["knife", "pistol", "firestaff"];
+const weaponChoices = ["knife", "pistol", "firestaff", "flailshield", "bow", "bolt"];
 
 let p1WeaponIndex = 0;
 let p2WeaponIndex = 0;
@@ -61,13 +66,13 @@ function draw() {
   drawArrow(p2X - 60, 185, "left");
   drawArrow(p2X + 45, 185, "right");
 
-  // Weapon icons with firestaff rotated 90 degrees
+  // Weapon icons with firestaff/flailshield rotated 90 degrees
   for (let i = 0; i < 2; i++) {
     const x = i === 0 ? p1X : p2X;
     const index = i === 0 ? p1WeaponIndex : p2WeaponIndex;
     const img = weaponIcons[index];
 
-    if (weaponChoices[index] === "firestaff") {
+    if (weaponChoices[index] === "firestaff" || weaponChoices[index] === "flailshield") {
       ctx.save();
       ctx.translate(x, 185); // center point of rotation
       ctx.rotate(Math.PI / 2); // 90 degrees
@@ -88,16 +93,30 @@ function draw() {
   // Instruction text
   ctx.fillStyle = "#000";
   ctx.font = "32px serif";
+  ctx.textAlign = "center";
   ctx.fillText("Make your choice!", 600, 700);
 
-  // Go to Battle text
-  ctx.fillStyle = "green";
-  ctx.font = "24px monospace";
+  // GO TO BATTLE (in alto a destra)
+  ctx.fillStyle = "#000";
+  ctx.font = "20px monospace";
   ctx.textAlign = "right";
-  ctx.fillText("GO TO BATTLE! [SPACE]", canvas.width - 30, 50);
+  ctx.fillText("GO TO BATTLE!", canvas.width - 20, 30);
+
+  // Modalità di gioco (1P o 2P)
+  const currentMode = localStorage.getItem("gameMode") || "2P";
+  ctx.fillStyle = "#000";
+  ctx.font = "20px monospace";
+  ctx.textAlign = "left";
+  ctx.fillText("Mode: " + currentMode, 30, 50);
+  ctx.fillText("Press M to toggle 1P / 2P", 30, 80);
+}
+
+function update() {
+  // Nessuna logica temporale
 }
 
 function gameLoop() {
+  update();
   draw();
   requestAnimationFrame(gameLoop);
 }
@@ -122,9 +141,12 @@ window.addEventListener("keydown", e => {
     case "ArrowRight":
       p2WeaponIndex = (p2WeaponIndex + 1) % weaponChoices.length;
       break;
+    case "m":
+      const current = localStorage.getItem("gameMode") || "2P";
+      localStorage.setItem("gameMode", current === "1P" ? "2P" : "1P");
+      break;
     case " ":
-      e.preventDefault(); // 👈 serve per evitare il refresh del browser
-      endSelection();     // GO TO BATTLE
+      endSelection(); // SPACEBAR = GO TO BATTLE
       break;
   }
 });
@@ -133,7 +155,7 @@ window.addEventListener("keydown", e => {
 let loaded = 0;
 function tryStart() {
   loaded++;
-  if (loaded === weaponIcons.length + 2) gameLoop();
+  if (loaded === 8) gameLoop(); // 6 icons + 2 player images
 }
 
 player1Img.onload = tryStart;
