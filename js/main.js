@@ -1,8 +1,77 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-// Load images
-const ring = new Image(); ring.src = "/assets/img/ring.png";
+
+// Map selection and image loading (refactored)
+const mapChoice = localStorage.getItem("mapChoice") || "arena";
+let mapImage = new Image();
+mapImage.src = `assets/img/${mapChoice}.png`;
+
+let collisionMapImage = new Image();
+collisionMapImage.src = `assets/img/${mapChoice}_collision.png`;
+let collisionCanvas = document.createElement("canvas");
+let collisionCtx = collisionCanvas.getContext("2d");
+collisionMapImage.onload = () => {
+  collisionCanvas.width = collisionMapImage.width;
+  collisionCanvas.height = collisionMapImage.height;
+  collisionCtx.drawImage(collisionMapImage, 0, 0);
+};
+
+// Lava collision map support for volcano and other custom maps (updated block)
+let lavaCanvas, lavaCtx, lavaReady = false;
+if (["volcano", "custom1", "custom2"].includes(mapChoice)) {
+    lavaCanvas = document.createElement('canvas');
+    lavaCtx = lavaCanvas.getContext('2d');
+    const volcanoCollisionImg = new Image();
+    volcanoCollisionImg.crossOrigin = "anonymous";
+    volcanoCollisionImg.src = "assets/img/volcano_collision.png";
+    console.log("Loading collision map from:", volcanoCollisionImg.src);
+
+    volcanoCollisionImg.onload = () => {
+        lavaCanvas.width = volcanoCollisionImg.width;
+        lavaCanvas.height = volcanoCollisionImg.height;
+        lavaCtx.drawImage(volcanoCollisionImg, 0, 0);
+        lavaReady = true;
+        console.log("Volcano collision map loaded and ready");
+        console.log("Collision image actual dimensions:", volcanoCollisionImg.width, volcanoCollisionImg.height);
+    };
+}
+
+function isLava(x, y, width = 50, height = 50) {
+  if (!lavaReady || !lavaCanvas || !lavaCtx) return false;
+
+  const step = 5;
+
+  // Scaling factors between game canvas and lava collision canvas
+  const scaleX = lavaCanvas.width / canvas.width;
+  const scaleY = lavaCanvas.height / canvas.height;
+
+  const footHeight = 15;
+  for (let dx = 0; dx < width; dx += step) {
+    for (let dy = height - footHeight; dy < height; dy += step) {
+      const px = Math.floor((x + dx) * scaleX);
+      const py = Math.floor((y + dy) * scaleY);
+      if (px < 0 || py < 0 || px >= lavaCanvas.width || py >= lavaCanvas.height) continue;
+
+      const pixel = lavaCtx.getImageData(px, py, 1, 1).data;
+      const alpha = pixel[3];
+      if (alpha > 0) return true;
+    }
+  }
+  return false;
+}
+
+function isCollidingWithMap(x, y) {
+  if (!collisionCtx) return false;
+  const pixel = collisionCtx.getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
+  return pixel[3] > 0; // collisione se il pixel non è trasparente
+}
+
+// Start game when map image loads
+mapImage.onload = () => {
+  gameLoop();
+};
+
 const player1Img = new Image(); player1Img.src = "/assets/img/player1.png";
 const player2Img = new Image(); player2Img.src = "/assets/img/player2.png";
 const knifeImg = new Image(); knifeImg.src = "/assets/img/knife.png";
@@ -261,7 +330,47 @@ function updateAI() {
   const weapon = player2.weapon;
   const p1Weapon = player1.weapon;
 
+  // Nuovo: funzione di movimento AI che evita la lava (solo su volcano)
   const approach = (dx, dy) => {
+    // Se la collisione lava è pronta, tentiamo di aggirare la lava
+    if (lavaReady) {
+      // Calcolo posizione target
+      const targetX = player2.x + (dx > 0 ? SPEED : dx < 0 ? -SPEED : 0);
+      const targetY = player2.y + (dy > 0 ? SPEED : dy < 0 ? -SPEED : 0);
+      let speed = SPEED;
+      let directions = [
+        { dx: speed, dy: 0 },
+        { dx: -speed, dy: 0 },
+        { dx: 0, dy: speed },
+        { dx: 0, dy: -speed }
+      ];
+      // Ordina le direzioni in base alla distanza dall'obiettivo
+      directions.sort((a, b) => {
+        let distA = Math.hypot((player2.x + a.dx) - (player2.x + dx), (player2.y + a.dy) - (player2.y + dy));
+        let distB = Math.hypot((player2.x + b.dx) - (player2.x + dx), (player2.y + b.dy) - (player2.y + dy));
+        return distA - distB;
+      });
+      // Trova la prima direzione valida che non collide
+      let found = false;
+      for (let dir of directions) {
+        let nextX = player2.x + dir.dx;
+        let nextY = player2.y + dir.dy;
+        if (!isLava(nextX, nextY + 15)) {
+          // Imposta le direzioni
+          player2.left = dir.dx < 0;
+          player2.right = dir.dx > 0;
+          player2.up = dir.dy < 0;
+          player2.down = dir.dy > 0;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        player2.left = player2.right = player2.up = player2.down = false;
+      }
+      return;
+    }
+    // Default: movimento diretto
     player2.left = dx < 0;
     player2.right = dx > 0;
     player2.up = dy < 0;
@@ -399,10 +508,15 @@ function update() {
   // BONUS: spawn bonus if none active and cooldown elapsed
   if (!activeBonus && bonusCooldown <= 0) {
     const type = bonusTypes[Math.floor(Math.random() * bonusTypes.length)];
+    let x, y;
+    do {
+      x = BOUNDING_BOX.x + Math.random() * BOUNDING_BOX.width;
+      y = BOUNDING_BOX.y + Math.random() * BOUNDING_BOX.height;
+    } while (isCollidingWithMap(x, y));
     activeBonus = {
       type,
-      x: Math.random() * (BOUNDING_BOX.width - 40) + BOUNDING_BOX.x + 20,
-      y: Math.random() * (BOUNDING_BOX.height - 40) + BOUNDING_BOX.y + 20,
+      x,
+      y,
       img: bonusImgs[type]
     };
     bonusTimer = 480; // 8 secondi a 60fps
@@ -439,13 +553,35 @@ function update() {
     }
   });
 
+  // Movimento "morbido" per player1 e player2 (scivolamento sui bordi)
   for (const p of [player1, player2]) {
     const currentSpeed = (p.bonus === "SPEED" ? SPEED * 1.3 : SPEED) * p.moveDebuff;
-    if (p.up && p.y > BOUNDING_BOX.y) p.y -= currentSpeed;
-    if (p.down && p.y + PLAYER_SIZE < BOUNDING_BOX.y + BOUNDING_BOX.height) p.y += currentSpeed;
-    if (p.left && p.x > BOUNDING_BOX.x) p.x -= currentSpeed;
-    if (p.right && p.x + PLAYER_SIZE < BOUNDING_BOX.x + BOUNDING_BOX.width) p.x += currentSpeed;
-
+    // Calcola il nuovo potenziale x e y in base agli input
+    const nextX = p.x + (p.right ? currentSpeed : 0) - (p.left ? currentSpeed : 0);
+    const nextY = p.y + (p.down ? currentSpeed : 0) - (p.up ? currentSpeed : 0);
+    // Limita ai bordi della bounding box
+    const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+    const clampedNextX = clamp(nextX, BOUNDING_BOX.x, BOUNDING_BOX.x + BOUNDING_BOX.width - PLAYER_SIZE);
+    const clampedNextY = clamp(nextY, BOUNDING_BOX.y, BOUNDING_BOX.y + BOUNDING_BOX.height - PLAYER_SIZE);
+    // Punto di controllo collisione (piede del personaggio)
+    const checkX = clampedNextX + PLAYER_SIZE / 2;
+    const checkY = clampedNextY + PLAYER_SIZE - 10;
+    // Funzione collisione
+    const collides = (x, y) => isCollidingWithMap(x, y);
+    if (!collides(checkX, checkY)) {
+      p.x = clampedNextX;
+      p.y = clampedNextY;
+    } else {
+      // Prova a muovere solo X
+      const checkOnlyX = (p.x !== clampedNextX);
+      const checkOnlyY = (p.y !== clampedNextY);
+      if (checkOnlyX && !collides(clampedNextX + PLAYER_SIZE / 2, p.y + PLAYER_SIZE - 10)) {
+        p.x = clampedNextX;
+      } else if (checkOnlyY && !collides(p.x + PLAYER_SIZE / 2, clampedNextY + PLAYER_SIZE - 10)) {
+        p.y = clampedNextY;
+      }
+      // Altrimenti resta fermo
+    }
     if (p.attacking) {
       p.attackTimer--;
       p.knifeAngle += 0.5;
@@ -472,6 +608,18 @@ function update() {
     b.x += b.dx;
     b.y += b.dy;
 
+    // Bolt collision with map (desert): rimbalzo/expire
+    if (mapChoice === "desert" && isCollidingWithMap(b.x, b.y)) {
+      if (!b.hasBounced) b.hasBounced = 0;
+      if (b.hasBounced < 2) {
+        b.dx *= -1;
+        b.dy *= -1;
+        b.hasBounced++;
+      } else {
+        b.expired = true;
+      }
+    }
+
     if (b.x <= BOUNDING_BOX.x || b.x >= BOUNDING_BOX.x + BOUNDING_BOX.width) {
       b.dx *= -1; b.bounces++;
     }
@@ -494,7 +642,7 @@ function update() {
       continue;
     }
 
-    if (b.bounces > 2) {
+    if (b.bounces > 2 || b.expired) {
       bolts.splice(i, 1);
     }
   }
@@ -506,6 +654,12 @@ function update() {
       fb.traveled += Math.sqrt(fb.dx ** 2 + fb.dy ** 2);
       fb.angle = Math.sin(fb.traveled / 10) * 0.5;
       const hitBounds = fb.x < BOUNDING_BOX.x || fb.x > BOUNDING_BOX.x + BOUNDING_BOX.width || fb.y < BOUNDING_BOX.y || fb.y > BOUNDING_BOX.y + BOUNDING_BOX.height;
+      // Fireball collision with map (desert): esplodi
+      if (mapChoice === "desert" && isCollidingWithMap(fb.x, fb.y)) {
+        fb.exploding = true;
+        fb.explosionTimer = 60;
+        fb.hasDamaged = false;
+      }
       if (fb.traveled >= 350 || hitBounds) {
         fb.exploding = true;
         fb.angle = 0;
@@ -626,9 +780,8 @@ function drawWeapon(player) {
 }
 
 function draw() {
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(ring, 0, 0, canvas.width, canvas.height);
+  // Draw background map
+  ctx.drawImage(mapImage, 0, 0, canvas.width, canvas.height);
 
   // Draw active bonus on the ring
   if (activeBonus) {
@@ -877,12 +1030,6 @@ window.addEventListener("keyup", e => {
 });
 
 let loaded = 0;
-function tryStartGame() {
-  loaded++;
-  if (loaded === 13) gameLoop();
-}
-
-[ring, player1Img, player2Img, knifeImg, pistolImg, firestaffImg, firestaffCDImg, fireballImg, p1Heart, p2Heart,
- bonusImgs.SPEED, bonusImgs.RAGE, bonusImgs.SHIELD, arrowImg, boltImg].forEach(img => img.onload = tryStartGame);
+// Remove old preloading logic for ring/ring2.
 
 // Replaced by updated performAttack above

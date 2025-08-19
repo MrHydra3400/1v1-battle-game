@@ -4,6 +4,14 @@ const ctx = canvas.getContext("2d");
 // Load images
 const player1Img = new Image(); player1Img.src = "/assets/img/player1.png";
 const player2Img = new Image(); player2Img.src = "/assets/img/player2.png";
+const mapThumbs = [
+  new Image(),
+  new Image(),
+  new Image() // desert
+];
+mapThumbs[0].src = "/assets/img/arena.png";
+mapThumbs[1].src = "/assets/img/volcano.png";
+mapThumbs[2].src = "/assets/img/desert.png";
 const weaponIcons = [
   new Image(),
   new Image(),
@@ -23,6 +31,8 @@ const weaponChoices = ["knife", "pistol", "firestaff", "flailshield", "bow", "bo
 
 let p1WeaponIndex = 0;
 let p2WeaponIndex = 0;
+let mapIndex = 0;
+const mapChoices = ["Arena", "Volcano", "Desert"]; // display names only
 
 function drawArrow(x, y, direction) {
   ctx.fillStyle = "black";
@@ -96,6 +106,21 @@ function draw() {
   ctx.textAlign = "center";
   ctx.fillText("Make your choice!", 600, 700);
 
+  // Map Selection (centered)
+  const mapX = canvas.width / 2;
+  ctx.drawImage(mapThumbs[mapIndex], mapX - 83, 345, 166, 94);
+
+  // Map filename
+  ctx.fillStyle = "#000";
+  ctx.font = "16px monospace";
+  ctx.fillText(mapChoices[mapIndex], mapX, 330);
+
+  // G to Cycle maps
+  ctx.fillStyle = "#000";
+  ctx.font = "20px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("Press G to Cycle", canvas.width - 600, 300);
+
   // GO TO BATTLE (in alto a destra)
   ctx.fillStyle = "#000";
   ctx.font = "20px monospace";
@@ -124,6 +149,8 @@ function gameLoop() {
 function endSelection() {
   localStorage.setItem("player1Weapon", weaponChoices[p1WeaponIndex]);
   localStorage.setItem("player2Weapon", weaponChoices[p2WeaponIndex]);
+  const mapFiles = ["arena", "volcano", "desert"]; // internal filenames
+  localStorage.setItem("mapChoice", mapFiles[mapIndex]);
   window.location.href = "index.html?mode=main";
 }
 
@@ -145,6 +172,12 @@ window.addEventListener("keydown", e => {
       const current = localStorage.getItem("gameMode") || "2P";
       localStorage.setItem("gameMode", current === "1P" ? "2P" : "1P");
       break;
+    case "g":
+      mapIndex = (mapIndex - 1 + mapChoices.length) % mapChoices.length;
+      break;
+    case "h":
+      mapIndex = (mapIndex + 1) % mapChoices.length;
+      break;
     case " ":
       endSelection(); // SPACEBAR = GO TO BATTLE
       break;
@@ -155,9 +188,10 @@ window.addEventListener("keydown", e => {
 let loaded = 0;
 function tryStart() {
   loaded++;
-  if (loaded === 8) gameLoop(); // 6 icons + 2 player images
+  if (loaded === 11) gameLoop(); // 6 icons + 2 player images + 3 map thumbs
 }
 
 player1Img.onload = tryStart;
 player2Img.onload = tryStart;
 weaponIcons.forEach(icon => icon.onload = tryStart);
+mapThumbs.forEach(img => img.onload = tryStart);
