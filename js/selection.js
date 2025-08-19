@@ -12,7 +12,7 @@ const weaponIcons = [
   new Image(), // Bow
   new Image() // Bolt
 ];
-weaponIcons[0].src = "/assets/img/Knife.png";      // Knife
+weaponIcons[0].src = "/assets/img/knife.png";      // Knife
 weaponIcons[1].src = "/assets/img/pistol.png";     // Pistol
 weaponIcons[2].src = "/assets/img/firestaff.png";  // Firestaff
 weaponIcons[3].src = "/assets/img/flailshield.png"; // Flail and Shield
