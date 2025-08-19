@@ -2,7 +2,7 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 // Load images
-const ring = new Image(); ring.src = "assets/img/ring.png";
+const ring = new Image(); ring.src = "/assets/img/ring.png";
 const player1Img = new Image(); player1Img.src = "/assets/img/player1.png";
 const player2Img = new Image(); player2Img.src = "/assets/img/player2.png";
 const knifeImg = new Image(); knifeImg.src = "/assets/img/knife.png";
