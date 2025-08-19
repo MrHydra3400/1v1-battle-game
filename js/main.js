@@ -3,29 +3,29 @@ const ctx = canvas.getContext("2d");
 
 // Load images
 const ring = new Image(); ring.src = "assets/img/ring.png";
-const player1Img = new Image(); player1Img.src = "assets/img/player1.png";
-const player2Img = new Image(); player2Img.src = "assets/img/player2.png";
-const knifeImg = new Image(); knifeImg.src = "assets/img/knife.png";
-const pistolImg = new Image(); pistolImg.src = "assets/img/pistol.png";
-const firestaffImg = new Image(); firestaffImg.src = "assets/img/firestaff.png";
-const firestaffCDImg = new Image(); firestaffCDImg.src = "assets/img/firestaff_cd.png";
-const flailShieldImg = new Image(); flailShieldImg.src = "assets/img/flailshield.png";
-const fireballImg = new Image(); fireballImg.src = "assets/img/fireball.png";
-const bowImg = new Image(); bowImg.src = "assets/img/bow.png";
-const bowHoldImg = new Image(); bowHoldImg.src = "assets/img/bow_hold.png";
-const arrowImg = new Image(); arrowImg.src = "assets/img/arrow.png";
-const p1Heart = new Image(); p1Heart.src = "assets/img/P1 Health.png";
-const p2Heart = new Image(); p2Heart.src = "assets/img/P2 Health.png";
-const flailImg = new Image(); flailImg.src = "assets/img/flail.png";
-const shieldImg = new Image(); shieldImg.src = "assets/img/shield.png";
-const boltImg = new Image(); boltImg.src = "assets/img/bolt.png";
+const player1Img = new Image(); player1Img.src = "/assets/img/player1.png";
+const player2Img = new Image(); player2Img.src = "/assets/img/player2.png";
+const knifeImg = new Image(); knifeImg.src = "/assets/img/knife.png";
+const pistolImg = new Image(); pistolImg.src = "/assets/img/pistol.png";
+const firestaffImg = new Image(); firestaffImg.src = "/assets/img/firestaff.png";
+const firestaffCDImg = new Image(); firestaffCDImg.src = "/assets/img/firestaff_cd.png";
+const flailShieldImg = new Image(); flailShieldImg.src = "/assets/img/flailshield.png";
+const fireballImg = new Image(); fireballImg.src = "/assets/img/fireball.png";
+const bowImg = new Image(); bowImg.src = "/assets/img/bow.png";
+const bowHoldImg = new Image(); bowHoldImg.src = "/assets/img/bow_hold.png";
+const arrowImg = new Image(); arrowImg.src = "/assets/img/arrow.png";
+const p1Heart = new Image(); p1Heart.src = "/assets/img/P1 Health.png";
+const p2Heart = new Image(); p2Heart.src = "/assets/img/P2 Health.png";
+const flailImg = new Image(); flailImg.src = "/assets/img/flail.png";
+const shieldImg = new Image(); shieldImg.src = "/assets/img/shield.png";
+const boltImg = new Image(); boltImg.src = "/assets/img/bolt.png";
 
 // BONUS SYSTEM
 const bonusTypes = ["SPEED", "RAGE", "SHIELD"];
 const bonusImgs = {
-  SPEED: (() => { const img = new Image(); img.src = "assets/img/bonus_speed.png"; return img; })(),
-  RAGE: (() => { const img = new Image(); img.src = "assets/img/bonus_rage.png"; return img; })(),
-  SHIELD: (() => { const img = new Image(); img.src = "assets/img/bonus_shield.png"; return img; })()
+  SPEED: (() => { const img = new Image(); img.src = "/assets/img/bonus_speed.png"; return img; })(),
+  RAGE: (() => { const img = new Image(); img.src = "/assets/img/bonus_rage.png"; return img; })(),
+  SHIELD: (() => { const img = new Image(); img.src = "/assets/img/bonus_shield.png"; return img; })()
 };
 let activeBonus = null;
 let bonusTimer = 0;

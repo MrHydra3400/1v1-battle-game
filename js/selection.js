@@ -2,8 +2,8 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 // Load images
-const player1Img = new Image(); player1Img.src = "assets/img/player1.png";
-const player2Img = new Image(); player2Img.src = "assets/img/player2.png";
+const player1Img = new Image(); player1Img.src = "/assets/img/player1.png";
+const player2Img = new Image(); player2Img.src = "/assets/img/player2.png";
 const weaponIcons = [
   new Image(),
   new Image(),
@@ -12,12 +12,12 @@ const weaponIcons = [
   new Image(), // Bow
   new Image() // Bolt
 ];
-weaponIcons[0].src = "assets/img/Knife.png";      // Knife
-weaponIcons[1].src = "assets/img/pistol.png";     // Pistol
-weaponIcons[2].src = "assets/img/firestaff.png";  // Firestaff
-weaponIcons[3].src = "assets/img/flailshield.png"; // Flail and Shield
-weaponIcons[4].src = "assets/img/bow_hold.png"; // Bow
-weaponIcons[5].src = "assets/img/bolt.png"; // Bolt
+weaponIcons[0].src = "/assets/img/Knife.png";      // Knife
+weaponIcons[1].src = "/assets/img/pistol.png";     // Pistol
+weaponIcons[2].src = "/assets/img/firestaff.png";  // Firestaff
+weaponIcons[3].src = "/assets/img/flailshield.png"; // Flail and Shield
+weaponIcons[4].src = "/assets/img/bow_hold.png"; // Bow
+weaponIcons[5].src = "/assets/img/bolt.png"; // Bolt
 // Weapon names
 const weaponChoices = ["knife", "pistol", "firestaff", "flailshield", "bow", "bolt"];
 
