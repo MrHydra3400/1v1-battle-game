@@ -4,6 +4,8 @@ const ctx = canvas.getContext("2d");
 // Load images
 const player1Img = new Image(); player1Img.src = "/assets/img/player1.png";
 const player2Img = new Image(); player2Img.src = "/assets/img/player2.png";
+const challengerImg = new Image();
+challengerImg.src = "/assets/img/player_challengers.png";
 const mapThumbs = [
   new Image(),
   new Image(),
@@ -64,32 +66,47 @@ function draw() {
   ctx.drawImage(player1Img, -90, -125, 180, 250);
   ctx.restore();
 
+  const currentMode = localStorage.getItem("gameMode") || "2P";
+
   ctx.save();
   ctx.translate(p2X, playerY);
   ctx.scale(1, 0.8);
-  ctx.drawImage(player2Img, -90, -125, 180, 250);
+  if (currentMode === "Challengers") {
+    ctx.scale(1.5, 1.5);
+    ctx.drawImage(challengerImg, -80, -130, 160, 220); // Adjusted size for 1.5 scale
+  } else {
+    ctx.drawImage(player2Img, -90, -125, 180, 250);
+  }
   ctx.restore();
 
   // Arrows
-  drawArrow(p1X - 60, 185, "left");
-  drawArrow(p1X + 45, 185, "right");
-  drawArrow(p2X - 60, 185, "left");
-  drawArrow(p2X + 45, 185, "right");
+  drawArrow(p1X - 60, 275, "left");
+  drawArrow(p1X + 45, 275, "right");
+
+  if (currentMode !== "Challengers") {
+    drawArrow(p2X - 60, 275, "left");
+    drawArrow(p2X + 45, 275, "right");
+  }
 
   // Weapon icons with firestaff/flailshield rotated 90 degrees
   for (let i = 0; i < 2; i++) {
     const x = i === 0 ? p1X : p2X;
     const index = i === 0 ? p1WeaponIndex : p2WeaponIndex;
+
+    if (i === 1 && currentMode === "Challengers") {
+      continue;
+    }
+
     const img = weaponIcons[index];
 
     if (weaponChoices[index] === "firestaff" || weaponChoices[index] === "flailshield") {
       ctx.save();
-      ctx.translate(x, 185); // center point of rotation
+      ctx.translate(x, 275); // center point of rotation
       ctx.rotate(Math.PI / 2); // 90 degrees
       ctx.drawImage(img, 0, -30, 30, 60);
       ctx.restore();
     } else {
-      ctx.drawImage(img, x - 30, 185, 64, 30);
+      ctx.drawImage(img, x - 30, 275, 64, 30);
     }
   }
 
@@ -97,8 +114,11 @@ function draw() {
   ctx.fillStyle = "#000";
   ctx.font = "20px monospace";
   ctx.textAlign = "center";
-  ctx.fillText(weaponChoices[p1WeaponIndex].toUpperCase(), p1X, 160);
-  ctx.fillText(weaponChoices[p2WeaponIndex].toUpperCase(), p2X, 160);
+  ctx.fillText(weaponChoices[p1WeaponIndex].toUpperCase(), p1X, 250);
+
+  if (currentMode !== "Challengers") {
+    ctx.fillText(weaponChoices[p2WeaponIndex].toUpperCase(), p2X, 250);
+  }
 
   // Instruction text
   ctx.fillStyle = "#000";
@@ -108,18 +128,20 @@ function draw() {
 
   // Map Selection (centered)
   const mapX = canvas.width / 2;
-  ctx.drawImage(mapThumbs[mapIndex], mapX - 83, 345, 166, 94);
-
-  // Map filename
-  ctx.fillStyle = "#000";
-  ctx.font = "16px monospace";
-  ctx.fillText(mapChoices[mapIndex], mapX, 330);
+  if (currentMode !== "Challengers") {
+    ctx.fillStyle = "#000";
+    ctx.font = "16px monospace";
+    ctx.fillText(mapChoices[mapIndex], mapX, 330);
+    ctx.drawImage(mapThumbs[mapIndex], mapX - 83, 345, 166, 94);
+  }
 
   // G to Cycle maps
-  ctx.fillStyle = "#000";
-  ctx.font = "20px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText("Press G to Cycle", canvas.width - 600, 300);
+  if (currentMode !== "Challengers") {
+    ctx.fillStyle = "#000";
+    ctx.font = "20px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("Press G to Cycle", canvas.width - 600, 300);
+  }
 
   // GO TO BATTLE (in alto a destra)
   ctx.fillStyle = "#000";
@@ -128,12 +150,30 @@ function draw() {
   ctx.fillText("GO TO BATTLE!", canvas.width - 20, 30);
 
   // Modalità di gioco (1P o 2P)
-  const currentMode = localStorage.getItem("gameMode") || "2P";
+  let modeLabel = "Mode: " + currentMode;
   ctx.fillStyle = "#000";
   ctx.font = "20px monospace";
   ctx.textAlign = "left";
-  ctx.fillText("Mode: " + currentMode, 30, 50);
-  ctx.fillText("Press M to toggle 1P / 2P", 30, 80);
+  ctx.fillText(modeLabel, 30, 50);
+  ctx.fillText("Press M to toggle 1P / 2P / Challengers", 30, 80);
+
+  // Display top 3 Challengers with weapon icon
+  if (currentMode === "Challengers") {
+    const scores = JSON.parse(localStorage.getItem("challengerScores") || "[]");
+    ctx.font = "16px monospace";
+    ctx.fillStyle = "#000";
+    ctx.fillText("Top 3 Challengers:", 30, 110);
+    scores
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .forEach((entry, i) => {
+        ctx.fillText(`${i + 1}. ${entry.name} - ${entry.score}`, 30, 130 + i * 50);
+        const weaponIndex = weaponChoices.indexOf(entry.weapon);
+        if (weaponIndex !== -1) {
+          ctx.drawImage(weaponIcons[weaponIndex], 220, 112 + i * 50, 32, 32);
+        }
+      });
+  }
 }
 
 function update() {
@@ -170,7 +210,9 @@ window.addEventListener("keydown", e => {
       break;
     case "m":
       const current = localStorage.getItem("gameMode") || "2P";
-      localStorage.setItem("gameMode", current === "1P" ? "2P" : "1P");
+      const modes = ["2P", "1P", "Challengers"];
+      const nextIndex = (modes.indexOf(current) + 1) % modes.length;
+      localStorage.setItem("gameMode", modes[nextIndex]);
       break;
     case "g":
       mapIndex = (mapIndex - 1 + mapChoices.length) % mapChoices.length;
@@ -188,10 +230,11 @@ window.addEventListener("keydown", e => {
 let loaded = 0;
 function tryStart() {
   loaded++;
-  if (loaded === 11) gameLoop(); // 6 icons + 2 player images + 3 map thumbs
+  if (loaded === 12) gameLoop(); // 6 icons + 2 player images + 3 map thumbs + challenger image
 }
 
 player1Img.onload = tryStart;
 player2Img.onload = tryStart;
+challengerImg.onload = tryStart;
 weaponIcons.forEach(icon => icon.onload = tryStart);
 mapThumbs.forEach(img => img.onload = tryStart);

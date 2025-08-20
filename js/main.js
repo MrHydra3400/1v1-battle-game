@@ -5,10 +5,10 @@ const ctx = canvas.getContext("2d");
 // Map selection and image loading (refactored)
 const mapChoice = localStorage.getItem("mapChoice") || "arena";
 let mapImage = new Image();
-mapImage.src = `assets/img/${mapChoice}.png`;
+mapImage.src = `/assets/img/${mapChoice}.png`;
 
 let collisionMapImage = new Image();
-collisionMapImage.src = `assets/img/${mapChoice}_collision.png`;
+collisionMapImage.src = `/assets/img/${mapChoice}_collision.png`;
 let collisionCanvas = document.createElement("canvas");
 let collisionCtx = collisionCanvas.getContext("2d");
 collisionMapImage.onload = () => {
@@ -19,12 +19,12 @@ collisionMapImage.onload = () => {
 
 // Lava collision map support for volcano and other custom maps (updated block)
 let lavaCanvas, lavaCtx, lavaReady = false;
-if (["volcano", "custom1", "custom2"].includes(mapChoice)) {
+if (["volcano"].includes(mapChoice)) {
     lavaCanvas = document.createElement('canvas');
     lavaCtx = lavaCanvas.getContext('2d');
     const volcanoCollisionImg = new Image();
     volcanoCollisionImg.crossOrigin = "anonymous";
-    volcanoCollisionImg.src = "assets/img/volcano_collision.png";
+    volcanoCollisionImg.src = "/assets/img/volcano_collision.png";
     console.log("Loading collision map from:", volcanoCollisionImg.src);
 
     volcanoCollisionImg.onload = () => {
@@ -68,12 +68,22 @@ function isCollidingWithMap(x, y) {
 }
 
 // Start game when map image loads
+// Prevent multiple gameLoop() calls by using a flag
+let gameStarted = false;
+function startGame() {
+  if (!gameStarted) {
+    gameStarted = true;
+    requestAnimationFrame(gameLoop);
+  }
+}
 mapImage.onload = () => {
-  gameLoop();
+  startGame();
 };
 
 const player1Img = new Image(); player1Img.src = "/assets/img/player1.png";
-const player2Img = new Image(); player2Img.src = "/assets/img/player2.png";
+const player2Img = new Image();
+const gameMode = localStorage.getItem("gameMode");
+player2Img.src = gameMode === "Challengers" ? "/assets/img/player_challengers.png" : "/assets/img/player2.png";
 const knifeImg = new Image(); knifeImg.src = "/assets/img/knife.png";
 const pistolImg = new Image(); pistolImg.src = "/assets/img/pistol.png";
 const firestaffImg = new Image(); firestaffImg.src = "/assets/img/firestaff.png";
@@ -127,6 +137,12 @@ function updateArrows() {
       if (target.bonus === "SHIELD") damage *= 0.5;
       const shooter = a.owner === "p1" ? player1 : player2;
       if (shooter.bonus === "RAGE") damage *= 1.5;
+
+      // Apply poison if charging arrow hits
+      if (a.power === 30) {
+        target.poisonTimer = 240; // 4 seconds at 60 FPS
+      }
+
       target.health = Math.max(0, target.health - damage);
       arrows.splice(i, 1);
     }
@@ -164,6 +180,10 @@ function createPlayer(x, y, weapon) {
     bonus: null,
     bonusTimer: 0,
     moveDebuff: 1,
+    poisonTimer: 0, // Poison duration in frames (4 seconds = 240 frames at 60 FPS)
+    poisonDamage: 5, // Danno per tick di veleno
+    burnTimer: 0, // Timer for burn effect (6 seconds = 360 frames at 60 FPS)
+    burnDamage: 2.5 // Danno per tick di fiamma
   };
 }
 
@@ -200,10 +220,33 @@ function shootBolt(shooter) {
   ammo.count--;
 }
 
+const selectedMode = (localStorage.getItem("gameMode") || "").toLowerCase();
+let p1Lives = 3;
+if (selectedMode === "challengers") {
+  p1Lives = 5;
+}
+// Track kills for Challengers mode leaderboard
+let challengerKillCount = 0;
 const player1 = createPlayer(BOUNDING_BOX.x + 50, BOUNDING_BOX.y + 50, localStorage.getItem("player1Weapon") || "knife");
-const player2 = createPlayer(BOUNDING_BOX.x + BOUNDING_BOX.width - 50 - PLAYER_SIZE, BOUNDING_BOX.y + BOUNDING_BOX.height - 50 - PLAYER_SIZE, localStorage.getItem("player2Weapon") || "knife");
-const isSinglePlayer = localStorage.getItem("gameMode") === "1P";
+const player2 = createPlayer(
+  BOUNDING_BOX.x + BOUNDING_BOX.width - 50 - PLAYER_SIZE,
+  BOUNDING_BOX.y + BOUNDING_BOX.height - 50 - PLAYER_SIZE,
+  localStorage.getItem("player2Weapon") || "knife"
+);
+
+// Score for Player 1 in challengers mode
+let player1Score = 0;
+const isSinglePlayer = localStorage.getItem("gameMode") === "1P" || selectedMode === "challengers";
 const difficulty = localStorage.getItem("difficulty") || "easy";
+
+// Ensure Player 2 starts with 500 HP in challengers mode
+if (selectedMode === "challengers") {
+  // Randomize map and weapon at start
+  const newMap = getRandomMap();
+  reloadMapAssets(newMap);
+  player2.weapon = getRandomWeapon();
+  player2.health = 500;
+}
 
 let message = "";
 let messageTimer = 0;
@@ -505,6 +548,23 @@ function updateAI() {
 function update() {
   if (gameOver) return;
 
+  // Handle poison and burn damage
+  [player1, player2].forEach(p => {
+    if (p.poisonTimer > 0) {
+      if (frameCount % 60 === 0) { // Apply poison damage every second
+        p.health = Math.max(0, p.health - p.poisonDamage);
+      }
+      p.poisonTimer--;
+    }
+
+    if (p.burnTimer > 0) {
+      if (frameCount % 30 === 0) { // Apply burn damage every 30 frames
+        p.health = Math.max(0, p.health - p.burnDamage);
+      }
+      p.burnTimer--;
+    }
+  });
+
   // BONUS: spawn bonus if none active and cooldown elapsed
   if (!activeBonus && bonusCooldown <= 0) {
     const type = bonusTypes[Math.floor(Math.random() * bonusTypes.length)];
@@ -636,7 +696,7 @@ function update() {
       if (shooter.bonus === "RAGE") damage *= 1.5;
       target.health = Math.max(0, target.health - damage);
       // Apply moveDebuff to target
-      target.moveDebuff = 0.8;
+      target.moveDebuff = 0.65;
       setTimeout(() => { target.moveDebuff = 1; }, 2000);
       bolts.splice(i, 1);
       continue;
@@ -649,12 +709,25 @@ function update() {
 
   for (let fb of fireballs) {
     if (!fb.exploding) {
+      // Movimento della Fireball
       fb.x += fb.dx;
       fb.y += fb.dy;
       fb.traveled += Math.sqrt(fb.dx ** 2 + fb.dy ** 2);
       fb.angle = Math.sin(fb.traveled / 10) * 0.5;
+
+      // Controllo collisione diretta con il target
+      const target = fb.owner === "p1" ? player2 : player1;
+      const dx = fb.x - (target.x + PLAYER_SIZE / 2);
+      const dy = fb.y - (target.y + PLAYER_SIZE / 2);
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < 30) { // Collisione diretta
+        target.burnTimer = 360; // Applica il Burn Effect per 6 secondi
+        // La Fireball NON esplode e NON infligge danni diretti
+      }
+
+      // Controllo collisione con i bordi o mappa
       const hitBounds = fb.x < BOUNDING_BOX.x || fb.x > BOUNDING_BOX.x + BOUNDING_BOX.width || fb.y < BOUNDING_BOX.y || fb.y > BOUNDING_BOX.y + BOUNDING_BOX.height;
-      // Fireball collision with map (desert): esplodi
       if (mapChoice === "desert" && isCollidingWithMap(fb.x, fb.y)) {
         fb.exploding = true;
         fb.explosionTimer = 60;
@@ -666,17 +739,22 @@ function update() {
         fb.explosionTimer = 60;
       }
     } else {
+      // Gestione esplosione della Fireball
       fb.explosionTimer--;
       if (!fb.hasDamaged && fb.explosionTimer <= 58) {
         const target = fb.owner === "p1" ? player2 : player1;
         const dx = fb.x - (target.x + PLAYER_SIZE / 2);
         const dy = fb.y - (target.y + PLAYER_SIZE / 2);
-        if (Math.sqrt(dx * dx + dy * dy) < 75) {
-          let damage = 25;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < 75) { // Area di impatto dell'esplosione
+          let damage = 25; // Danno dell'esplosione
           if (target.bonus === "SHIELD") damage *= 0.5;
           const shooter = fb.owner === "p1" ? player1 : player2;
           if (shooter.bonus === "RAGE") damage *= 1.5;
+
           target.health = Math.max(0, target.health - damage);
+          target.burnTimer = 360; // Applica il Burn Effect per 6 secondi
           fb.hasDamaged = true;
         }
       }
@@ -702,40 +780,158 @@ function update() {
   }
 
   if (player1.health <= 0 && player1.lives > 0) {
-    player1.lives--; player1.health = 200; player2.health = 200;
-    player1.x = BOUNDING_BOX.x + 50; player1.y = BOUNDING_BOX.y + 50;
-    message = "Player 1 has been slain"; messageTimer = 120;
-    // Clear all bonuses and timers when a player is slain
-    player1.bonus = null;
-    player1.bonusTimer = 0;
-    player2.bonus = null;
-    player2.bonusTimer = 0;
-    activeBonus = null;
-    bonusTimer = 0;
-    bonusCooldown = 600; // Optional: shorten cooldown to avoid long delay
+    if (selectedMode === "challengers") {
+      if (player1.health <= 0 && p1Lives > 0) {
+        p1Lives--;
+        // Reset health, position, buffs, and show message
+        player1.health = 200;
+        player1.x = BOUNDING_BOX.x + 50;
+        player1.y = BOUNDING_BOX.y + 50;
+        player1.bonus = null;
+        player1.bonusTimer = 0;
+        player1.poisonTimer = 0; // Reset Poison
+        player1.burnTimer = 0;   // Reset Burn
+        player1.moveDebuff = 1; // Reset move debuff
+        player2.bonus = null;
+        player2.bonusTimer = 0;
+        player2.poisonTimer = 0; // Reset Poison
+        player2.burnTimer = 0;   // Reset Burn
+        player2.moveDebuff = 1; // Reset move debuff
+        activeBonus = null;
+        bonusTimer = 0;
+        bonusCooldown = 600;
+        message = "Player 1 has been slain";
+        messageTimer = 120;
+      }
+      // Only end game after reset, when p1Lives is now 0
+      if (p1Lives === 0 && !gameOver) {
+        gameOver = true;
+        message = "GAME OVER";
+        setTimeout(() => {
+          ctx.fillStyle = 'black';
+          ctx.font = '48px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
+          ctx.font = '24px monospace';
+          ctx.fillText(`Your Score: ${player1Score}`, canvas.width / 2, canvas.height / 2 + 30);
+        }, 100);
+      }
+    } else {
+      player1.lives--;
+      player1.health = 200;
+      player2.health = 200;
+      player1.x = BOUNDING_BOX.x + 50;
+      player1.y = BOUNDING_BOX.y + 50;
+      player1.poisonTimer = 0; // Reset Poison
+      player1.burnTimer = 0;   // Reset Burn
+      player1.moveDebuff = 1; // Reset move debuff
+      message = "Player 1 has been slain";
+      messageTimer = 120;
+      player1.bonus = null;
+      player1.bonusTimer = 0;
+      player2.bonus = null;
+      player2.bonusTimer = 0;
+      player2.poisonTimer = 0; // Reset Poison
+      player2.burnTimer = 0;   // Reset Burn
+      player2.moveDebuff = 1; // Reset move debuff
+      activeBonus = null;
+      bonusTimer = 0;
+      bonusCooldown = 600;
+    }
   }
-  if (player2.health <= 0 && player2.lives > 0) {
-    player2.lives--; player2.health = 200; player1.health = 200;
-    player2.x = BOUNDING_BOX.x + BOUNDING_BOX.width - 50 - PLAYER_SIZE;
-    player2.y = BOUNDING_BOX.y + BOUNDING_BOX.height - 50 - PLAYER_SIZE;
-    message = "Player 2 has been slain"; messageTimer = 120;
-    // Clear all bonuses and timers when a player is slain
-    player1.bonus = null;
-    player1.bonusTimer = 0;
-    player2.bonus = null;
-    player2.bonusTimer = 0;
-    activeBonus = null;
-    bonusTimer = 0;
-    bonusCooldown = 600; // Optional: shorten cooldown to avoid long delay
+  if (player2.health <= 0) {
+    if (selectedMode === "challengers") {
+      // Infinite respawn for player 2
+      // Randomize map and weapon
+      const newMap = getRandomMap();
+      reloadMapAssets(newMap);
+      player2.weapon = getRandomWeapon();
+
+      player2.health = 500;
+      player1.health = 200;
+      player2.x = BOUNDING_BOX.x + BOUNDING_BOX.width - 50 - PLAYER_SIZE;
+      player2.y = BOUNDING_BOX.y + BOUNDING_BOX.height - 50 - PLAYER_SIZE;
+      message = "Player 2 has been slain"; messageTimer = 120;
+      player1Score++;
+      challengerKillCount++; // Track for leaderboard
+      player1.bonus = null;
+      player1.bonusTimer = 0;
+      player2.poisonTimer = 0; // Reset Poison
+      player2.burnTimer = 0;   // Reset Burn
+      player2.moveDebuff = 1; // Reset move debuff
+      player2.bonus = null;
+      player2.bonusTimer = 0;
+      player1.poisonTimer = 0; // Reset Poison
+      player1.burnTimer = 0;   // Reset Burn
+      player1.moveDebuff = 1; // Reset move debuff
+      activeBonus = null;
+      bonusTimer = 0;
+      bonusCooldown = 600;
+      // --- REMOVED: No speedup or timing change based on kills in challengers mode ---
+      // (If any logic here previously increased game speed or decreased delay, it is now removed.)
+    } else if (player2.lives > 0) {
+      player2.lives--;
+      player2.health = 200;
+      player1.health = 200;
+      player2.x = BOUNDING_BOX.x + BOUNDING_BOX.width - 50 - PLAYER_SIZE;
+      player2.y = BOUNDING_BOX.y + BOUNDING_BOX.height - 50 - PLAYER_SIZE;
+      message = "Player 2 has been slain"; messageTimer = 120;
+      player1.poisonTimer = 0; // Reset Poison
+      player1.burnTimer = 0;   // Reset Burn
+      player1.moveDebuff = 1; // Reset move debuff
+      player1.bonus = null;
+      player1.bonusTimer = 0;
+      player2.poisonTimer = 0; // Reset Poison
+      player2.burnTimer = 0;   // Reset Burn
+      player2.moveDebuff = 1; // Reset move debuff
+      player2.bonus = null;
+      player2.bonusTimer = 0;
+      activeBonus = null;
+      bonusTimer = 0;
+      bonusCooldown = 600;
+    }
   }
-  if (player1.lives === 0 || player2.lives === 0) {
-    gameOver = true;
-    message = player1.lives === 0 ? "Player 2 wins!" : "Player 1 wins!";
+  // Move this block AFTER the above so the reset happens first:
+  if ((selectedMode === "challengers" ? p1Lives === 0 : player1.lives === 0) ||
+    (selectedMode !== "challengers" && player2.lives === 0)) {
+    if (selectedMode === "challengers" && p1Lives === 0) {
+      gameOver = true;
+      message = "GAME OVER";
+      setTimeout(() => {
+        ctx.fillStyle = 'black';
+        ctx.font = '48px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
+        ctx.font = '24px monospace';
+        ctx.fillText(`Your Score: ${player1Score}`, canvas.width / 2, canvas.height / 2 + 30);
+      }, 100);
+      // --- Challengers leaderboard logic ---
+      if (gameMode === "Challengers" && p1Lives <= 0) {
+        const player1Weapon = localStorage.getItem("player1Weapon");
+        const name = prompt("Game Over! Enter your name:");
+        if (name) {
+          const scores = JSON.parse(localStorage.getItem("challengerScores") || "[]");
+          scores.push({ name, score: challengerKillCount, weapon: player1Weapon });
+          scores.sort((a, b) => b.score - a.score);
+          localStorage.setItem("challengerScores", JSON.stringify(scores));
+        }
+      }
+      // --- End leaderboard logic ---
+    } else {
+      gameOver = true;
+      message = (player1.lives === 0 ? "Player 2 wins!" : "Player 1 wins!");
+    }
   }
 }
 
 // CONTINUA con draw(), gameLoop, eventi keydown/keyup, immagini preload...  
 // Dimmi se vuoi anche **quella parte finale** e te la mando subito qui.
+
+// Example UI update for hiding player 1 hearts in the DOM (if used elsewhere):
+// To remove hearts from right to left, use:
+// for (let i = 0; i < lostLives; i++) {
+//   hearts[hearts.length - 1 - i].style.display = "none";
+// }
 
 function drawKnife(player) {
   const cx = player.x + PLAYER_SIZE / 2;
@@ -783,6 +979,14 @@ function draw() {
   // Draw background map
   ctx.drawImage(mapImage, 0, 0, canvas.width, canvas.height);
 
+  // Show points at top-center in challengers mode
+  if (selectedMode === "challengers" && !gameOver) {
+    ctx.font = "32px monospace";
+    ctx.fillStyle = "#b11919ff";
+    ctx.textAlign = "center";
+    ctx.fillText(`${player1Score}`, canvas.width / 2, 50);
+  }
+
   // Draw active bonus on the ring
   if (activeBonus) {
     ctx.save();
@@ -794,7 +998,19 @@ function draw() {
 
   // Draw players with debuff glow if affected
   const drawPlayerWithDebuff = (player, img) => {
-    if (player.moveDebuff < 1) {
+    if (player.burnTimer > 0) {
+      ctx.save();
+      ctx.shadowColor = "red"; // Red glow for burn
+      ctx.shadowBlur = 20;
+      ctx.drawImage(img, player.x, player.y, PLAYER_SIZE, PLAYER_SIZE);
+      ctx.restore();
+    } else if (player.poisonTimer > 0) {
+      ctx.save();
+      ctx.shadowColor = "green"; // Green glow for poison
+      ctx.shadowBlur = 20;
+      ctx.drawImage(img, player.x, player.y, PLAYER_SIZE, PLAYER_SIZE);
+      ctx.restore();
+    } else if (player.moveDebuff < 1) {
       ctx.save();
       ctx.shadowColor = "yellow";
       ctx.shadowBlur = 20;
@@ -868,27 +1084,67 @@ function draw() {
   ctx.strokeStyle = "black";
   ctx.strokeRect(200, 730, 300, 20);
   ctx.fillStyle = "#007BFF";
-  ctx.fillRect(200, 730, 300 * player1.health / 200, 20);
+  // In challengers mode, if Player 1's health is 0 (after P2 is slain), draw the bar at 0
+  let p1HealthBar = player1.health;
+  if (selectedMode === "challengers" && player1.health <= 0 && message === "Player 2 has been slain") {
+    p1HealthBar = 0;
+  }
+  ctx.fillRect(200, 730, 300 * p1HealthBar / 200, 20);
 
   ctx.strokeRect(700, 730, 300, 20);
   ctx.fillStyle = "#FF3B30";
-  ctx.fillRect(700, 730, 300 * player2.health / 200, 20);
+  const p2HealthBarMax = selectedMode === "challengers" ? 500 : 200;
+  ctx.fillRect(700, 730, 300 * player2.health / p2HealthBarMax, 20);
 
   ctx.fillStyle = "#000";
   ctx.font = "16px sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(`${player1.health}%`, 200 + 150, 760);
-  ctx.fillText(`${player2.health}%`, 700 + 150, 760);
+  // Show 0% for Player 1 health if it was just reset (challengers mode)
+  let p1HealthText = player1.health;
+  if (selectedMode === "challengers" && player1.health <= 0 && message === "Player 2 has been slain") {
+    p1HealthText = 0;
+  }
+  ctx.fillText(`${p1HealthText}`, 200 + 150, 745);
+  ctx.fillText(`${player2.health}`, 700 + 150, 745);
 
-  const p1Positions = [518, 544, 570];
-  for (let i = 0; i < player1.lives; i++) ctx.drawImage(p1Heart, p1Positions[i], 730, 20, 20);
-  const p2Positions = [665, 640, 615];
-  for (let i = 0; i < player2.lives; i++) ctx.drawImage(p2Heart, p2Positions[i], 730, 20, 20);
+  // Draw player 1 hearts (normal or challengers mode)
+  if (selectedMode === "challengers") {
+    // Draw a heart for each remaining p1Lives, from right to left
+    for (let i = 0; i < p1Lives; i++) {
+      // Draw from right to left, starting at 510 + (5-1-i)*30
+      ctx.drawImage(p1Heart, 510 + (5 - 1 - i) * 30, 730, 22, 22);
+    }
+  } else {
+    // Remove hearts from right to left: draw only the rightmost 'player1.lives' hearts
+    const p1Positions = [518, 544, 570];
+    for (let i = 0; i < player1.lives; i++) {
+      ctx.drawImage(p1Heart, p1Positions[p1Positions.length - 1 - i], 730, 20, 20);
+    }
+  }
+  // Only draw player 2 hearts if not in "challengers" mode
+  if (selectedMode !== "challengers") {
+    const p2Positions = [665, 640, 615];
+    for (let i = 0; i < player2.lives; i++) ctx.drawImage(p2Heart, p2Positions[i], 730, 20, 20);
+  }
 
   if (messageTimer > 0 || gameOver) {
     ctx.fillStyle = "black";
-    ctx.font = "40px serif";
-    ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+    ctx.textAlign = "center";
+    if (gameOver && selectedMode === "challengers") {
+      ctx.font = "48px monospace";
+      ctx.fillText("GAME OVER!", canvas.width / 2, canvas.height / 2 - 40);
+      ctx.font = "32px monospace";
+      ctx.fillText(`Points: ${player1Score}`, canvas.width / 2, canvas.height / 2);
+      ctx.font = "24px monospace";
+      ctx.fillText("Press SPACEBAR to duel again", canvas.width / 2, canvas.height / 2 + 40);
+    } else {
+      ctx.font = "40px serif";
+      ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+      if (gameOver) {
+        ctx.font = "24px monospace";
+        ctx.fillText("Press SPACEBAR to duel again", canvas.width / 2, canvas.height / 2 + 40);
+      }
+    }
     if (!gameOver) messageTimer--;
   }
   if (gameOver) {
@@ -906,6 +1162,7 @@ function gameLoop() {
   update();
   updateAI();
   draw();
+  // Only call requestAnimationFrame here, never elsewhere.
   requestAnimationFrame(gameLoop);
 }
 
@@ -1029,7 +1286,31 @@ window.addEventListener("keyup", e => {
   }
 });
 
-let loaded = 0;
-// Remove old preloading logic for ring/ring2.
+function getRandomMap() {
+  const maps = ["arena", "desert", "volcano"];
+  return maps[Math.floor(Math.random() * maps.length)];
+}
 
-// Replaced by updated performAttack above
+function getRandomWeapon() {
+  const weapons = Object.keys(weaponTypes);
+  return weapons[Math.floor(Math.random() * weapons.length)];
+}
+
+function reloadMapAssets(mapChoice) {
+  mapImage.src = `/assets/img/${mapChoice}.png`;
+  collisionMapImage.src = `/assets/img/${mapChoice}_collision.png`;
+  // Lava collision support
+  if (["volcano", "custom1", "custom2"].includes(mapChoice)) {
+    const volcanoCollisionImg = new Image();
+    volcanoCollisionImg.crossOrigin = "anonymous";
+    volcanoCollisionImg.src = `/assets/img/${mapChoice}_collision.png`;
+    volcanoCollisionImg.onload = () => {
+      lavaCanvas.width = volcanoCollisionImg.width;
+      lavaCanvas.height = volcanoCollisionImg.height;
+      lavaCtx.drawImage(volcanoCollisionImg, 0, 0);
+      lavaReady = true;
+    };
+  } else {
+    lavaReady = false;
+  }
+}
