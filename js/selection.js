@@ -1,4 +1,23 @@
 const canvas = document.getElementById("gameCanvas");
+
+let firebaseScores = [];
+
+function fetchTopScores() {
+  const db = window.firebase.database();
+  db.ref("challengerScores")
+    .orderByChild("score")
+    .limitToLast(3)
+    .once("value", snapshot => {
+      const data = [];
+      snapshot.forEach(child => {
+        data.unshift(child.val()); // unshift per ottenere ordine decrescente
+      });
+      firebaseScores = data;
+    });
+}
+
+fetchTopScores(); // carica all'avvio
+
 const ctx = canvas.getContext("2d");
 
 // Load images
@@ -162,16 +181,13 @@ function draw() {
     ctx.font = "16px monospace";
     ctx.fillStyle = "#000";
     ctx.fillText("Top 3 Challengers:", 30, 110);
-    scores
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 3)
-      .forEach((entry, i) => {
-        ctx.fillText(`${i + 1}. ${entry.name} - ${entry.score}`, 30, 130 + i * 50);
-        const weaponIndex = weaponChoices.indexOf(entry.weapon);
-        if (weaponIndex !== -1) {
-          ctx.drawImage(weaponIcons[weaponIndex], 220, 112 + i * 50, 32, 32);
-        }
-      });
+    firebaseScores.forEach((entry, i) => {
+      ctx.fillText(`${i + 1}. ${entry.name} - ${entry.score}`, 30, 130 + i * 50);
+      const weaponIndex = weaponChoices.indexOf(entry.weapon);
+      if (weaponIndex !== -1) {
+        ctx.drawImage(weaponIcons[weaponIndex], 220, 112 + i * 50, 32, 32);
+      }
+    });
   }
 }
 

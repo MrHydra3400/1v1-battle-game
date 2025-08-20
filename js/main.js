@@ -1,3 +1,6 @@
+// Firebase initialization for leaderboard (requires <script> block in HTML)
+// See index.html for the <script type="module"> that sets up window.firebase
+
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
@@ -905,15 +908,20 @@ function update() {
         ctx.font = '24px monospace';
         ctx.fillText(`Your Score: ${player1Score}`, canvas.width / 2, canvas.height / 2 + 30);
       }, 100);
-      // --- Challengers leaderboard logic ---
-      if (gameMode === "Challengers" && p1Lives <= 0) {
-        const player1Weapon = localStorage.getItem("player1Weapon");
-        const name = prompt("Game Over! Enter your name:");
-        if (name) {
-          const scores = JSON.parse(localStorage.getItem("challengerScores") || "[]");
-          scores.push({ name, score: challengerKillCount, weapon: player1Weapon });
-          scores.sort((a, b) => b.score - a.score);
-          localStorage.setItem("challengerScores", JSON.stringify(scores));
+      // --- Challengers leaderboard logic with Firebase ---
+      if (selectedMode === "challengers") {
+        const playerName = prompt("Inserisci il tuo nome per la classifica:");
+        const playerWeapon = localStorage.getItem("player1Weapon") || "unknown";
+
+        if (playerName) {
+          const entry = {
+            name: playerName,
+            score: player1Score,
+            weapon: playerWeapon,
+            timestamp: Date.now()
+          };
+          const { database, ref, push } = window.firebase;
+          push(ref(database, "scores"), entry);
         }
       }
       // --- End leaderboard logic ---
