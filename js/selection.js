@@ -159,7 +159,6 @@ function draw() {
 
   // Display top 3 Challengers with weapon icon
   if (currentMode === "Challengers") {
-    const scores = JSON.parse(localStorage.getItem("challengerScores") || "[]");
     ctx.font = "16px monospace";
     ctx.fillStyle = "#000";
     ctx.fillText("Top 3 Challengers:", 30, 110);
