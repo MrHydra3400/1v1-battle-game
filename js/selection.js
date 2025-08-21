@@ -1,23 +1,4 @@
 const canvas = document.getElementById("gameCanvas");
-
-let firebaseScores = [];
-
-function fetchTopScores() {
-  const db = window.firebase.database();
-  db.ref("challengerScores")
-    .orderByChild("score")
-    .limitToLast(3)
-    .once("value", snapshot => {
-      const data = [];
-      snapshot.forEach(child => {
-        data.unshift(child.val()); // unshift per ottenere ordine decrescente
-      });
-      firebaseScores = data;
-    });
-}
-
-fetchTopScores(); // carica all'avvio
-
 const ctx = canvas.getContext("2d");
 
 // Load images
@@ -178,17 +159,63 @@ function draw() {
 
   // Display top 3 Challengers with weapon icon
   if (currentMode === "Challengers") {
+    const scores = JSON.parse(localStorage.getItem("challengerScores") || "[]");
     ctx.font = "16px monospace";
     ctx.fillStyle = "#000";
     ctx.fillText("Top 3 Challengers:", 30, 110);
-    firebaseScores.forEach((entry, i) => {
-      ctx.fillText(`${i + 1}. ${entry.name} - ${entry.score}`, 30, 130 + i * 50);
-      const weaponIndex = weaponChoices.indexOf(entry.weapon);
-      if (weaponIndex !== -1) {
-        ctx.drawImage(weaponIcons[weaponIndex], 220, 112 + i * 50, 32, 32);
-      }
-    });
+    scores
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .forEach((entry, i) => {
+        ctx.fillText(`${i + 1}. ${entry.name} - ${entry.score}`, 30, 130 + i * 50);
+        const weaponIndex = weaponChoices.indexOf(entry.weapon);
+        if (weaponIndex !== -1) {
+          if (entry.weapon === "firestaff") {
+            ctx.save();
+            ctx.translate(236, 128 + i * 50); // center of icon (220 + 16, y + 16)
+            ctx.rotate(1.30899694); // ~75 degrees in radians
+            ctx.drawImage(weaponIcons[weaponIndex], -16, -16, 25, 50);
+            ctx.restore();
+          } else {
+            ctx.drawImage(weaponIcons[weaponIndex], 195, 115 + i * 50, 45, 30);
+          }
+        }
+      });
   }
+}
+
+let instructionsShown = false;
+let instructionsActive = true;
+
+function showInstructions() {
+  ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+  ctx.fillRect(0, 0, 1000, 800);
+  ctx.fillStyle = "#000";
+  ctx.font = "20px monospace";
+  ctx.textAlign = "left";
+
+  const lines = [
+    "🎮 CONTROLS:",
+    "- Player 1: A/D to switch weapons, F to toggle fire mode",
+    "- Player 2: Arrow Left/Right to switch weapon, L to toggle fire mode",
+    "- Press G to cycle maps",
+    "- Press M to toggle mode: 1P / 2P / Challengers",
+    "- SPACE to start the battle",
+    "",
+    "⚔️  WEAPON INFO:",
+    "- Bow: Hold to charge the arrow, powered arrow inflicts poison",
+    "- Firestaff: Fires a fireball, tap again to make it explode",
+    "- Bolt: Damages and slows, boosted attack on debuffed targets",
+    "- Flail/Shield: Defensive stance and close range hits",
+    "- Knife: Quick spinning melee attack",
+    "- Pistol: Ranged single shot",
+    "",
+    "👉 Press any key or click to continue..."
+  ];
+
+  lines.forEach((line, i) => {
+    ctx.fillText(line, 140, 150 + i * 30);
+  });
 }
 
 function update() {
@@ -198,6 +225,9 @@ function update() {
 function gameLoop() {
   update();
   draw();
+  if (instructionsActive) {
+    showInstructions();
+  }
   requestAnimationFrame(gameLoop);
 }
 
@@ -253,3 +283,14 @@ player2Img.onload = tryStart;
 challengerImg.onload = tryStart;
 weaponIcons.forEach(icon => icon.onload = tryStart);
 mapThumbs.forEach(img => img.onload = tryStart);
+
+window.addEventListener("keydown", () => {
+  if (instructionsActive) {
+    instructionsActive = false;
+  }
+});
+canvas.addEventListener("click", () => {
+  if (instructionsActive) {
+    instructionsActive = false;
+  }
+});

@@ -1,6 +1,3 @@
-// Firebase initialization for leaderboard (requires <script> block in HTML)
-// See index.html for the <script type="module"> that sets up window.firebase
-
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
@@ -142,7 +139,7 @@ function updateArrows() {
       if (shooter.bonus === "RAGE") damage *= 1.5;
 
       // Apply poison if charging arrow hits
-      if (a.power === 30) {
+      if (a.power === 30) { 
         target.poisonTimer = 240; // 4 seconds at 60 FPS
       }
 
@@ -184,7 +181,7 @@ function createPlayer(x, y, weapon) {
     bonusTimer: 0,
     moveDebuff: 1,
     poisonTimer: 0, // Poison duration in frames (4 seconds = 240 frames at 60 FPS)
-    poisonDamage: 5, // Danno per tick di veleno
+    poisonDamage: 7.5, // Danno per tick di veleno
     burnTimer: 0, // Timer for burn effect (6 seconds = 360 frames at 60 FPS)
     burnDamage: 2.5 // Danno per tick di fiamma
   };
@@ -242,13 +239,14 @@ let player1Score = 0;
 const isSinglePlayer = localStorage.getItem("gameMode") === "1P" || selectedMode === "challengers";
 const difficulty = localStorage.getItem("difficulty") || "easy";
 
-// Ensure Player 2 starts with 500 HP in challengers mode
+// Ensure Player 2 starts with 300 HP in challengers mode
 if (selectedMode === "challengers") {
   // Randomize map and weapon at start
   const newMap = getRandomMap();
   reloadMapAssets(newMap);
   player2.weapon = getRandomWeapon();
-  player2.health = 500;
+  player2.health = 300;
+  player2.maxHP = 300;
 }
 
 let message = "";
@@ -548,6 +546,74 @@ function updateAI() {
   }
 }
 
+// Challenger AI burst timers
+let aiLastPistolBurst = 0;
+let aiLastFirestaffBurst = 0;
+let aiLastBoltBurst = 0;
+
+function shootBulletFromPlayer2(angleDeg) {
+  const angle = angleDeg * Math.PI / 180;
+  bullets.push({
+    x: player2.x + PLAYER_SIZE / 2,
+    y: player2.y + PLAYER_SIZE / 2,
+    dx: Math.cos(angle) * 7,
+    dy: Math.sin(angle) * 7,
+    owner: "p2"
+  });
+}
+
+function shootFireballFromPlayer2(angle) {
+  const speed = 4;
+  const range = 350;
+
+  const dx = Math.cos(angle * Math.PI / 180) * speed;
+  const dy = Math.sin(angle * Math.PI / 180) * speed;
+
+  fireballs.push({
+    x: player2.x + PLAYER_SIZE / 2,
+    y: player2.y + PLAYER_SIZE / 2,
+    dx,
+    dy,
+    distanceTraveled: 0,
+    maxDistance: range,
+    owner: "p2",
+    explode: false
+  });
+
+  // Firestaff cooldown for AI bursts is ignored for burst (for challenge mode)
+  fireballs.push({
+    x: player2.x + PLAYER_SIZE / 2,
+    y: player2.y + PLAYER_SIZE / 2,
+    dx: Math.cos(angle) * 6,
+    dy: Math.sin(angle) * 6,
+    traveled: 0,
+    owner: "p2",
+    angle: 0,
+    exploding: false,
+    explosionTimer: 60,
+    hasDamaged: false
+  });
+}
+
+function shootBoltFromPlayer2(angle) {
+  const speed = 6;
+  const range = 400;
+
+  const dx = Math.cos(angle * Math.PI / 180) * speed;
+  const dy = Math.sin(angle * Math.PI / 180) * speed;
+
+  bolts.push({
+    x: player2.x + PLAYER_SIZE / 2,
+    y: player2.y + PLAYER_SIZE / 2,
+    dx,
+    dy,
+    distanceTraveled: 0,
+    maxDistance: range,
+    owner: "p2",
+    type: "bolt"
+  });
+}
+
 function update() {
   if (gameOver) return;
 
@@ -658,6 +724,42 @@ function update() {
   updateAI();
   updateArrows();
 
+  // Challenger Mode AI Burst Attacks
+  if (gameMode === "Challengers") {
+    // Use challengerScore (player1Score) for burst logic
+    const challengerScore = typeof player1Score !== "undefined" ? player1Score : 0;
+    const now = Date.now();
+    if (challengerScore >= 5 && challengerScore < 10) {
+      if (now - aiLastPistolBurst > 20000) {
+        const angles = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360];
+        angles.forEach(angle => {
+          shootBulletFromPlayer2(angle);
+        });
+        aiLastPistolBurst = now;
+      }
+    }
+
+    if (challengerScore >= 10) {
+      if (now - aiLastFirestaffBurst > 10000) {
+        const angles = [45, 90, 135, 180, 225, 270, 315, 360];
+        angles.forEach(angle => {
+          shootFireballFromPlayer2(angle);
+        });
+        aiLastFirestaffBurst = now;
+      }
+    }
+
+    if (challengerScore >= 15) {
+      if (now - aiLastBoltBurst > 15000) {
+        const angles = [0, 15, 30, 45, 60, 75, 90];
+        angles.forEach(angle => {
+          shootBoltFromPlayer2(angle);
+        });
+        aiLastBoltBurst = now;
+      }
+    }
+  }
+
   const now = performance.now();
   ["p1", "p2"].forEach(p => {
     const ammo = boltAmmo[p];
@@ -693,14 +795,22 @@ function update() {
     const target = b.owner === "p1" ? player2 : player1;
     if (b.x > target.x && b.x < target.x + PLAYER_SIZE &&
         b.y > target.y && b.y < target.y + PLAYER_SIZE) {
-      let damage = 20;
+      let damage = 10;
+      let isPoweredHit = false;
+      if (target.moveDebuff < 1) {
+        damage *= 4.0;
+        target.moveDebuff = 1;
+        isPoweredHit = true; // Raddoppia il danno su target con bolt aurea
+      }
       if (target.bonus === "SHIELD") damage *= 0.5;
       const shooter = b.owner === "p1" ? player1 : player2;
       if (shooter.bonus === "RAGE") damage *= 1.5;
       target.health = Math.max(0, target.health - damage);
       // Apply moveDebuff to target
-      target.moveDebuff = 0.65;
-      setTimeout(() => { target.moveDebuff = 1; }, 2000);
+      if (!isPoweredHit) {
+        target.moveDebuff = 0.65;
+        setTimeout(() => { target.moveDebuff = 1; }, 2000);
+      }
       bolts.splice(i, 1);
       continue;
     }
@@ -850,8 +960,8 @@ function update() {
       reloadMapAssets(newMap);
       player2.weapon = getRandomWeapon();
 
-      player2.health = 500;
-      player1.health = 200;
+      player2.health = 300;
+      player2.maxHP = 300;
       player2.x = BOUNDING_BOX.x + BOUNDING_BOX.width - 50 - PLAYER_SIZE;
       player2.y = BOUNDING_BOX.y + BOUNDING_BOX.height - 50 - PLAYER_SIZE;
       message = "Player 2 has been slain"; messageTimer = 120;
@@ -908,20 +1018,15 @@ function update() {
         ctx.font = '24px monospace';
         ctx.fillText(`Your Score: ${player1Score}`, canvas.width / 2, canvas.height / 2 + 30);
       }, 100);
-      // --- Challengers leaderboard logic with Firebase ---
-      if (selectedMode === "challengers") {
-        const playerName = prompt("Inserisci il tuo nome per la classifica:");
-        const playerWeapon = localStorage.getItem("player1Weapon") || "unknown";
-
-        if (playerName) {
-          const entry = {
-            name: playerName,
-            score: player1Score,
-            weapon: playerWeapon,
-            timestamp: Date.now()
-          };
-          const { database, ref, push } = window.firebase;
-          push(ref(database, "scores"), entry);
+      // --- Challengers leaderboard logic ---
+      if (gameMode === "Challengers" && p1Lives <= 0) {
+        const player1Weapon = localStorage.getItem("player1Weapon");
+        const name = prompt("Game Over! Enter your name:");
+        if (name) {
+          const scores = JSON.parse(localStorage.getItem("challengerScores") || "[]");
+          scores.push({ name, score: challengerKillCount, weapon: player1Weapon });
+          scores.sort((a, b) => b.score - a.score);
+          localStorage.setItem("challengerScores", JSON.stringify(scores));
         }
       }
       // --- End leaderboard logic ---
@@ -1101,7 +1206,7 @@ function draw() {
 
   ctx.strokeRect(700, 730, 300, 20);
   ctx.fillStyle = "#FF3B30";
-  const p2HealthBarMax = selectedMode === "challengers" ? 500 : 200;
+  const p2HealthBarMax = selectedMode === "challengers" ? 300 : 200;
   ctx.fillRect(700, 730, 300 * player2.health / p2HealthBarMax, 20);
 
   ctx.fillStyle = "#000";
@@ -1253,7 +1358,7 @@ window.addEventListener("keyup", e => {
           dx: Math.cos(offsetAngle) * 7,
           dy: Math.sin(offsetAngle) * 7,
           owner: "p1",
-          power: 5,
+          power: 3,
           angle: offsetAngle
         });
       });
@@ -1285,7 +1390,7 @@ window.addEventListener("keyup", e => {
           dx: Math.cos(offsetAngle) * 7,
           dy: Math.sin(offsetAngle) * 7,
           owner: "p2",
-          power: 5,
+          power: 3,
           angle: offsetAngle
         });
       });
